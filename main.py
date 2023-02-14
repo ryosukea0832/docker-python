@@ -8,7 +8,7 @@ from tkinter import ttk
 from tkinter import filedialog
 
 #
-import os,subprocess,shutil,threading
+import os,subprocess,shutil,sys
 
 import speech_recognition as sr
 
@@ -22,54 +22,29 @@ import time
 
 def meke_c():
     
-    os.makedirs('./mp4', exist_ok=True)
-    
     os.makedirs('./wav', exist_ok=True)
-    
     os.makedirs('./cut_wav',exist_ok=True)
-
-    os.makedirs('./out_text',exist_ok=True)
-
     return
 
 def meke_d():
-    shutil.rmtree('./mp4')
     shutil.rmtree('./wav')
     shutil.rmtree('./cut_wav')
     return
     
 
-def mov_to_mp4(movf):
-       
-    mp4f = movf.replace('.MOV', '.mp4')
-    mp4f = mp4f.replace('./mov/', './mp4/')
-   
-    if os.path.exists(mp4f):
-     os.remove(mp4f)
-
-#    subprocess.run(['ffmpeg', '-i', movf, mp4f], 
-#                   encoding='utf-8', stdout=subprocess.PIPE)
-    
-    command = ['ffmpeg', '-i', movf, mp4f]
-    start(command)
-
-    return mp4f
-
 # mp4から音声ファイルへの変換
-def mp4_to_wav(mp4f):
+def move_to_wav(mp4f):
+
+    fileNme = os.path.splitext(os.path.basename(mp4f))[0]
+    fileNme + '.wav'
+    work_wav = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])),'wav',fileNme + '.wav')
     
-    work_wav = mp4f.replace('.mp4', '.wav')
-    work_wav = work_wav.replace('./mp4/', './wav/')
+    print(work_wav)
+
     
     if os.path.exists(work_wav):
      os.remove(work_wav)
-
-#    subprocess.run(['ffmpeg', '-i', mp4f, work_wav], 
-#                   encoding='utf-8', stdout=subprocess.PIPE)
-    
-#    p = subprocess.Popen(['ffmpeg', '-i', mp4f, work_wav], 
-#                   encoding='utf-8', stdout=subprocess.PIPE)
-   
+  
     command = ['ffmpeg', '-i', mp4f, work_wav]
     start(command)
     print("mp4から音声ファイルへの変換")
@@ -100,11 +75,13 @@ def cut_wav(wavf,time=30):
   
     # wavファイルを削除
     os.remove(wavf)
+
+    iDir = os.path.abspath(os.path.dirname(sys.argv[0]))
   
     outf_list = []
     for i in range(num_cut):
         # 出力データを生成
-        outf = './cut_wav/' + str(i).zfill(3) + '.wav'
+        outf = iDir + '/cut_wav/' + str(i).zfill(3) + '.wav'
         start_cut = i*frames
         end_cut = i*frames + frames
         Y = X[start_cut:end_cut]
@@ -124,9 +101,9 @@ def cut_wav(wavf,time=30):
     print(outf_list)
     return outf_list
 
-# 複数ファイルの音声のテキスト変換
+# 複数ファイルの音声のテキスト変換（日本語）
 def cut_wavs_str(outf_list):
-    output_text = ''
+    output_text = []
     cont = 0
     # 複数処理
     print('音声のテキスト変換')
@@ -139,16 +116,17 @@ def cut_wavs_str(outf_list):
                     audio = r.record(source)
                     text = r.recognize_google(audio, language='ja-JP')
                     # 各ファイルの出力結果の結合
-                    output_text = output_text + text + '\n'
+                    output_text.append(text)
                     # wavファイルを削除
-                    os.remove(fwav)
+                    #os.remove(fwav)
             except sr.UnknownValueError:
-                print("could not understand audio" + fwav)
+                print("could not understand audio " + fwav)
                 # wavファイルを削除
                 os.remove(fwav)
             except sr.RequestError as e:
                 print("Could not request results from Google Speech Recognition service; {0}".format(e))
     return output_text
+
 
 # 実行ボタン押下時の実行関数
 def conductMain():
@@ -156,14 +134,9 @@ def conductMain():
     videoPach = entry2.get()
 
     print(videoPach)
-    # 動画ファイルの変換  
-    mp4f = mov_to_mp4(movf)
-
-    print(mp4f)
 
     # 音声ファイルへの変換
-    wav_file = mp4_to_wav(mp4f)
-
+    wav_file = move_to_wav(videoPach)
     print(wav_file)
 
     # 音声ファイルの分割(デフォルト30秒)
@@ -172,49 +145,41 @@ def conductMain():
     # 複数ファイルの音声のテキスト変換
     out_text = cut_wavs_str(cut_wavs)
 
+    for text in out_text:
     # テキストファイルへの入力
-    txtbox.insert(tkinter.END,text)
-    #text_up(text)
+     text =  text + '\n'
+     txtbox.insert(tk.END,text)
 
-    print("終了　後処理")
     meke_d()
+     
+    print("終了　後処理")
 
 # フォルダ指定の関数
 def dirdialog_clicked():
-    iDir = os.path.abspath(os.path.dirname(__file__))
-    iDirPath = filedialog.askdirectory(initialdir = iDir)
-    entry1.set(iDirPath)
+    print("dirdialog_clicked")
+#    iDir = os.path.abspath(os.path.dirname(__file__))
+#    iDirPath = filedialog.askdirectory(initialdir = iDir)
+#    entry1.set(iDirPath)
 
 # ファイル指定の関数
 def filedialog_clicked():
-    fTyp = [("", ".MOV")]
-    iFile = os.path.abspath(os.path.dirname(__file__))
+    fTyp = [("", "*.mov")]
+    iFile = os.path.abspath(os.path.dirname(sys.argv[0]))
     iFilePath = filedialog.askopenfilename(filetype = fTyp, initialdir = iFile)
     entry2.set(iFilePath)
 
 def start(command):
-    progress = tk.Toplevel()
-    bar = ttk.Progressbar(progress,mode='indeterminate')
-    bar.pack()
-    bar.start()
+    p = subprocess.Popen(command ,encoding='utf-8', shell=True)
+    p.wait()
 
-    def process(): 
-        p = subprocess.Popen(command ,encoding='utf-8', shell=True)
-
-        try:
-            outs, errs = p.communicate()
-        except subprocess.TimeoutExpired:
-            pass
-        else:
-            p.terminate()
-            progress.destroy()
-    
-    th1 = threading.Thread(target=process)
-    th1.start()
-
+def mozi_exe():
+    sys.exit()
 
 
 if __name__ == "__main__":
+
+    #main関数的な。。
+    meke_c()
 
     # メインウィンドウを作成
     baseGround = tk.Tk()
@@ -222,13 +187,6 @@ if __name__ == "__main__":
     baseGround.geometry('500x300')
     # 画面タイトル
     baseGround.title('動画より文字お越しアプリ')
-
-    sub_window = tk.Toplevel()
-    sub_window.title("動画より変換した文字列を表示")
-    sub_window.geometry('700x600')
-
-    #main関数的な。。
-    meke_c()
 
     # Frame1の作成
     frame1 = ttk.Frame(baseGround, padding=10)
@@ -273,15 +231,20 @@ if __name__ == "__main__":
     button1.pack(fill = "x", padx=30, side = "left")
 
     # キャンセルボタンの設置
-    button2 = ttk.Button(frame3, text=("閉じる"), command=quit)
+    button2 = ttk.Button(frame3, text=("閉じる"), command=mozi_exe)
     button2.pack(fill = "x", padx=30, side = "left")
 
-        #フレームの作成
+    #フレームの作成
+    sub_window = tk.Toplevel()
+    sub_window.title("動画より変換した文字列を表示")
+    sub_window.geometry('700x600')
+
+    # Frame4の作成
     frame4 = ttk.Frame(sub_window, padding=10)
     frame4.pack(fill=tk.BOTH, expand=tk.YES)
 
     #テキストボックスの作成
-    txtbox = tk.Text(frame4, width=400, height=300)
+    txtbox = tk.Text(frame4, width=400, height=300)  
 
     #縦方向スクロールバーの作成
     yscroll = ttk.Scrollbar(frame4, orient=tk.VERTICAL, command=txtbox.yview)
