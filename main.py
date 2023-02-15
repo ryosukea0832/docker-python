@@ -8,7 +8,7 @@ from tkinter import ttk
 from tkinter import filedialog
 
 #
-import os,subprocess,shutil,sys
+import os,subprocess,shutil,sys,threading
 
 import speech_recognition as sr
 
@@ -19,6 +19,8 @@ import struct
 import numpy as geek
 import time
 
+start_flag  = False
+videoPach = str("")
 
 def meke_c():
     
@@ -46,7 +48,7 @@ def move_to_wav(mp4f):
      os.remove(work_wav)
   
     command = ['ffmpeg', '-i', mp4f, work_wav]
-    start(command)
+    startFfmpeg(command)
     print("mp4から音声ファイルへの変換")
     print(work_wav)
     return work_wav
@@ -55,6 +57,7 @@ def move_to_wav(mp4f):
 def cut_wav(wavf,time=30):
     # timeの単位は[sec]
     # ファイルを読み出し
+    print("cut_wav",wavf)
     wr = wave.open(wavf, 'r')
 
     # waveファイルが持つ性質を取得
@@ -130,29 +133,49 @@ def cut_wavs_str(outf_list):
 
 # 実行ボタン押下時の実行関数
 def conductMain():
+    global videoPach
+    global start_flag
 
-    videoPach = entry2.get()
+    while True:
+ 
+        if start_flag:
 
-    print(videoPach)
+            if os.path.exists(videoPach):
 
-    # 音声ファイルへの変換
-    wav_file = move_to_wav(videoPach)
-    print(wav_file)
+                print(videoPach)
 
-    # 音声ファイルの分割(デフォルト30秒)
-    cut_wavs = cut_wav(wav_file)
+                # 音声ファイルへの変換
+                wav_file = move_to_wav(videoPach)
+                print(wav_file)
 
-    # 複数ファイルの音声のテキスト変換
-    out_text = cut_wavs_str(cut_wavs)
+                # 音声ファイルの分割(デフォルト30秒)
+                cut_wavs = cut_wav(wav_file)
 
-    for text in out_text:
-    # テキストファイルへの入力
-     text =  text + '\n'
-     txtbox.insert(tk.END,text)
+                # 複数ファイルの音声のテキスト変換
+                out_text = cut_wavs_str(cut_wavs)
 
-    meke_d()
-     
-    print("終了　後処理")
+                for text in out_text:
+                # テキストファイルへの入力
+                    text =  text + '\n'
+                    txtbox.insert(tk.END,text)
+
+            
+                print("終了　後処理")
+            start_flag  = False
+            progress.withdraw()
+
+def start_transcription():
+    global videoPach
+    global start_flag 
+
+    
+    if not (start_flag):
+        videoPach = entry2.get()    
+        start_flag  = True
+        
+        bar.start()
+
+    print("start_transcription",videoPach,start_flag)
 
 # フォルダ指定の関数
 def dirdialog_clicked():
@@ -168,11 +191,16 @@ def filedialog_clicked():
     iFilePath = filedialog.askopenfilename(filetype = fTyp, initialdir = iFile)
     entry2.set(iFilePath)
 
-def start(command):
-    p = subprocess.Popen(command ,encoding='utf-8', shell=True)
-    p.wait()
+def startFfmpeg(command):
+
+    subprocess.run(command ,encoding='utf-8', stdout=subprocess.PIPE)
+#    p = subprocess.Popen(command ,encoding='utf-8', shell=True)
+#    p.wait
+
 
 def mozi_exe():
+    meke_d()
+    baseGround.destroy()
     sys.exit()
 
 
@@ -227,7 +255,7 @@ if __name__ == "__main__":
     frame3.grid(row=5,column=1,sticky=W)
 
     # 実行ボタンの設置
-    button1 = ttk.Button(frame3, text="実行", command=conductMain)
+    button1 = ttk.Button(frame3, text="実行", command=start_transcription)
     button1.pack(fill = "x", padx=30, side = "left")
 
     # キャンセルボタンの設置
@@ -255,6 +283,17 @@ if __name__ == "__main__":
 
     #テキストボックスの設置
     txtbox.pack()
+
+    progress = tk.Toplevel()
+    bar = ttk.Progressbar(progress,mode='indeterminate')
+    bar.pack()
+    progress.withdraw()
+
+    th1 = threading.Thread(target=conductMain)
+    th1.start()
     
+    baseGround.protocol("WM_DELETE_WINDOW", mozi_exe)
+    sub_window.protocol("WM_DELETE_WINDOW", mozi_exe)
+    progress.protocol("WM_DELETE_WINDOW", mozi_exe)
     baseGround.mainloop()
         
