@@ -29,8 +29,10 @@ def meke_c():
     return
 
 def meke_d():
-    shutil.rmtree('./wav')
-    shutil.rmtree('./cut_wav')
+    if os.path.exists('./wav'):
+        shutil.rmtree('./wav')
+    if os.path.exists('./cut_wav'):
+        shutil.rmtree('./cut_wav')
     return
     
 
@@ -158,8 +160,6 @@ def conductMain():
                 # テキストファイルへの入力
                     text =  text + '\n'
                     txtbox.insert(tk.END,text)
-
-            
                 print("終了　後処理")
             start_flag  = False
             progress.withdraw()
@@ -174,6 +174,7 @@ def start_transcription():
         start_flag  = True
         
         bar.start()
+        progress.deiconify()
 
     print("start_transcription",videoPach,start_flag)
 
@@ -200,6 +201,8 @@ def startFfmpeg(command):
 
 def mozi_exe():
     meke_d()
+    sub_window.destroy()
+    progress.destroy()
     baseGround.destroy()
     sys.exit()
 
@@ -290,6 +293,7 @@ if __name__ == "__main__":
     progress.withdraw()
 
     th1 = threading.Thread(target=conductMain)
+    th1.setDaemon(True)
     th1.start()
     
     baseGround.protocol("WM_DELETE_WINDOW", mozi_exe)
