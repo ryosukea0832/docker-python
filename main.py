@@ -7,23 +7,21 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
 
-#
-import os,subprocess,shutil,sys,threading
+import os,shutil,sys,subprocess
 
 import speech_recognition as sr
-
-# 音声ファイルの分割
 import wave
 import math
 import struct
 import numpy as geek
-import time
+
+#オリジナルモジュール
+import transcriptionqueue as tcq
 
 start_flag  = False
 videoPach = str("")
 
 def meke_c():
-    
     os.makedirs('./wav', exist_ok=True)
     os.makedirs('./cut_wav',exist_ok=True)
     return
@@ -34,28 +32,64 @@ def meke_d():
     if os.path.exists('./cut_wav'):
         shutil.rmtree('./cut_wav')
     return
+
+def start_transcription():
     
+    videoPachs = entry2.get()
 
-# mp4から音声ファイルへの変換
-def move_to_wav(mp4f):
+    print(videoPachs)
 
-    fileNme = os.path.splitext(os.path.basename(mp4f))[0]
+    move_to_wav_queue.put(videoPachs)
+    
+    bar.start()
+    progress.deiconify()
+
+    print("start_transcription",videoPach)
+
+# フォルダ指定の関数
+def dirdialog_clicked():
+    print("dirdialog_clicked")
+#    iDir = os.path.abspath(os.path.dirname(__file__))
+#    iDirPath = filedialog.askdirectory(initialdir = iDir)
+#    entry1.set(iDirPath)
+
+# ファイル指定の関数
+def filedialog_clicked():
+    fTyp = [("", "*.mov")]
+    iFile = os.path.abspath(os.path.dirname(sys.argv[0]))
+    iFilePaths = filedialog.askopenfilename(filetype = fTyp, initialdir = iFile)
+    entry2.set(iFilePaths)
+
+def mozi_exe():
+    meke_d()
+
+    move_to_wav_queue.close()
+    move_to_wav_queue.join()
+    cut_wav_queue.close()
+    cut_wav_queue.join()
+    cut_wavs_str_queue.close()
+    cut_wavs_str_queue.join()
+
+    sub_window.destroy()
+    progress.destroy()
+    baseGround.destroy()
+    sys.exit()
+
+def move_to_wav(move):
+    print("move_to_wav",move)
+    fileNme = os.path.splitext(os.path.basename(move))[0]
     fileNme + '.wav'
     work_wav = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])),'wav',fileNme + '.wav')
-    
     print(work_wav)
-
     
     if os.path.exists(work_wav):
      os.remove(work_wav)
   
-    command = ['ffmpeg', '-i', mp4f, work_wav]
-    startFfmpeg(command)
-    print("mp4から音声ファイルへの変換")
-    print(work_wav)
+    command = ['ffmpeg', '-i', move, work_wav]
+    subprocess.run(command ,encoding='utf-8', stdout=subprocess.PIPE)
+    print("movから音声ファイルへの変換")
     return work_wav
 
-# 音声ファイルの分割(デフォルト30秒)
 def cut_wav(wavf,time=30):
     # timeの単位は[sec]
     # ファイルを読み出し
@@ -83,7 +117,7 @@ def cut_wav(wavf,time=30):
 
     iDir = os.path.abspath(os.path.dirname(sys.argv[0]))
   
-    outf_list = []
+    cutWav = []
     for i in range(num_cut):
         # 出力データを生成
         outf = iDir + '/cut_wav/' + str(i).zfill(3) + '.wav'
@@ -101,111 +135,34 @@ def cut_wav(wavf,time=30):
         ww.close()
       
         # リストに追加
-        outf_list.append(outf)
-        
-    print(outf_list)
-    return outf_list
+        cutWav.append(outf)
+    print(cutWav)
+    return cutWav
 
-# 複数ファイルの音声のテキスト変換（日本語）
-def cut_wavs_str(outf_list):
-    output_text = []
-    cont = 0
-    # 複数処理
+def cut_wavs_str(fwavs):
+    # 複数ファイルの音声のテキスト変換（日本語）
     print('音声のテキスト変換')
-    for fwav in outf_list:
-            try:
-                r = sr.Recognizer()
-                # 音声->テキスト
-                with sr.AudioFile(fwav) as source:
-                    print('音声→テキスト ')
-                    audio = r.record(source)
-                    text = r.recognize_google(audio, language='ja-JP')
-                    # 各ファイルの出力結果の結合
-                    output_text.append(text)
-                    # wavファイルを削除
-                    #os.remove(fwav)
-            except sr.UnknownValueError:
-                print("could not understand audio " + fwav)
-                # wavファイルを削除
-                os.remove(fwav)
-            except sr.RequestError as e:
-                print("Could not request results from Google Speech Recognition service; {0}".format(e))
-    return output_text
+    for fwav in fwavs:
+        try:
+            r = sr.Recognizer()
+            # 音声->テキスト
+            with sr.AudioFile(fwav) as source:
+                print('音声→テキスト ')
+                audio = r.record(source)
+                text = r.recognize_google(audio, language='ja-JP')
+                
+                # 毎回テキストボックスへ出力する
+                text =  text + '\n'
+                txtbox.insert(tk.END,text)
+        except sr.UnknownValueError:
+            print("could not understand audio " + fwav)
+            # wavファイルを削除
+            os.remove(fwav)
+        except sr.RequestError as e:
+            print("Could not request results from Google Speech Recognition service; {0}".format(e))
 
-
-# 実行ボタン押下時の実行関数
-def conductMain():
-    global videoPach
-    global start_flag
-
-    while True:
- 
-        if start_flag:
-
-            if os.path.exists(videoPach):
-
-                print(videoPach)
-
-                # 音声ファイルへの変換
-                wav_file = move_to_wav(videoPach)
-                print(wav_file)
-
-                # 音声ファイルの分割(デフォルト30秒)
-                cut_wavs = cut_wav(wav_file)
-
-                # 複数ファイルの音声のテキスト変換
-                out_text = cut_wavs_str(cut_wavs)
-
-                for text in out_text:
-                # テキストファイルへの入力
-                    text =  text + '\n'
-                    txtbox.insert(tk.END,text)
-                print("終了　後処理")
-            start_flag  = False
-            progress.withdraw()
-
-def start_transcription():
-    global videoPach
-    global start_flag 
-
-    
-    if not (start_flag):
-        videoPach = entry2.get()    
-        start_flag  = True
-        
-        bar.start()
-        progress.deiconify()
-
-    print("start_transcription",videoPach,start_flag)
-
-# フォルダ指定の関数
-def dirdialog_clicked():
-    print("dirdialog_clicked")
-#    iDir = os.path.abspath(os.path.dirname(__file__))
-#    iDirPath = filedialog.askdirectory(initialdir = iDir)
-#    entry1.set(iDirPath)
-
-# ファイル指定の関数
-def filedialog_clicked():
-    fTyp = [("", "*.mov")]
-    iFile = os.path.abspath(os.path.dirname(sys.argv[0]))
-    iFilePath = filedialog.askopenfilename(filetype = fTyp, initialdir = iFile)
-    entry2.set(iFilePath)
-
-def startFfmpeg(command):
-
-    subprocess.run(command ,encoding='utf-8', stdout=subprocess.PIPE)
-#    p = subprocess.Popen(command ,encoding='utf-8', shell=True)
-#    p.wait
-
-
-def mozi_exe():
-    meke_d()
-    sub_window.destroy()
-    progress.destroy()
-    baseGround.destroy()
-    sys.exit()
-
+    progress.withdraw()
+    return fwavs
 
 if __name__ == "__main__":
 
@@ -292,9 +249,20 @@ if __name__ == "__main__":
     bar.pack()
     progress.withdraw()
 
-    th1 = threading.Thread(target=conductMain)
-    th1.setDaemon(True)
-    th1.start()
+    move_to_wav_queue = tcq.TranscriptionQueue()
+    cut_wav_queue = tcq.TranscriptionQueue()
+    cut_wavs_str_queue = tcq.TranscriptionQueue()
+    done_queue = tcq.TranscriptionQueue()
+    threads = [
+        tcq.ChangeWorker(move_to_wav, move_to_wav_queue, cut_wav_queue),
+        tcq.ChangeWorker(cut_wav, cut_wav_queue, cut_wavs_str_queue),
+        tcq.ChangeWorker(cut_wavs_str, cut_wavs_str_queue, done_queue),
+    ]
+
+    # スレッド起動
+    for thread in threads:
+        thread.setDaemon(True)
+        thread.start()
     
     baseGround.protocol("WM_DELETE_WINDOW", mozi_exe)
     sub_window.protocol("WM_DELETE_WINDOW", mozi_exe)
