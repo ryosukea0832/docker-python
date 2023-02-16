@@ -39,10 +39,12 @@ def start_transcription():
 
     print(videoPachs)
 
-    move_to_wav_queue.put(videoPachs)
-    
-    bar.start()
-    progress.deiconify()
+    if os.path.exists(videoPachs):
+
+        move_to_wav_queue.put(videoPachs)
+        
+        bar.start()
+        progress.deiconify()
 
     print("start_transcription",videoPach)
 
