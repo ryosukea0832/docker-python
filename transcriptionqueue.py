@@ -29,31 +29,3 @@ class ChangeWorker(Thread):
             results = self.func(item)
             self.out_queue.put(results)
     
-
-##########################################################
-#move_to_wav_queue = TranscriptionQueue()
-#cut_wav_queue = TranscriptionQueue()
-#cut_wavs_str_queue = TranscriptionQueue()
-#done_queue = TranscriptionQueue()
-#threads = [
-#    ChangeWorker(move_to_wav, move_to_wav_queue, cut_wav_queue),
-#    ChangeWorker(cut_wav, cut_wav_queue, cut_wavs_str_queue),
-#    ChangeWorker(cut_wavs_str, cut_wavs_str_queue, done_queue),
-#]
-
-# すべての入力作業が投入されたら、第一段階の入力キューを閉じて停止信号を送る
-#for thread in threads:
-#    thread.setDaemon(True)
-#    thread.start()
-#for _ in range(1000):
-#    move_to_wav_queue.put(object())
-#move_to_wav_queue.close()
-
-# 各段階を結合してたキューをジョインして作業終了を待つ
-
-#move_to_wav_queue.join()
-#cut_wav_queue.close()
-#cut_wav_queue.join()
-#cut_wavs_str_queue.close()
-#cut_wavs_str_queue.join()
-#print(done_queue.qsize(), 'items finished')
